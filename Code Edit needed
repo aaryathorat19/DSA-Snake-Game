@@ -1,0 +1,165 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <conio.h>  // For getch() and kbhit()
+
+#define WIDTH 20
+#define HEIGHT 20
+
+typedef struct SnakeSegment {
+    int x, y;
+    struct SnakeSegment* next;
+} SnakeSegment;
+
+typedef struct {
+    SnakeSegment* head;
+    SnakeSegment* tail;
+    int length;
+    char direction;  // w = up, s = down, a = left, d = right
+} Snake;
+
+typedef struct {
+    int x, y;
+} Food;
+
+void initializeSnake(Snake* snake) {
+    snake->head = (SnakeSegment*)malloc(sizeof(SnakeSegment));
+    snake->head->x = WIDTH / 2;
+    snake->head->y = HEIGHT / 2;
+    snake->head->next = NULL;
+    snake->tail = snake->head;
+    snake->length = 1;
+    snake->direction = 'd';  // Start moving right
+}
+
+void generateFood(Food* food, Snake* snake) {
+    int valid;
+    do {
+        food->x = rand() % WIDTH;
+        food->y = rand() % HEIGHT;
+        
+        valid = 1;
+        SnakeSegment* current = snake->head;
+        while (current != NULL) {
+            if (current->x == food->x && current->y == food->y) {
+                valid = 0;
+                break;
+            }
+            current = current->next;
+        }
+    } while (!valid);
+}
+
+void printBoard(Snake* snake, Food* food) {
+    system("cls");  // Clear screen
+
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            if (x == 0 || x == WIDTH - 1 || y == 0 || y == HEIGHT - 1) {
+                printf("#");  // Walls
+            } else if (x == food->x && y == food->y) {
+                printf("F");  // Food
+            } else {
+                int isSnake = 0;
+                SnakeSegment* current = snake->head;
+                while (current != NULL) {
+                    if (current->x == x && current->y == y) {
+                        printf("O");
+                        isSnake = 1;
+                        break;
+                    }
+                    current = current->next;
+                }
+                if (!isSnake) {
+                    printf(" ");
+                }
+            }
+        }
+        printf("\n");
+    }
+}
+
+void moveSnake(Snake* snake, Food* food, int* gameOver) {
+    int newX = snake->head->x;
+    int newY = snake->head->y;
+
+    // Update the direction based on input
+    if (_kbhit()) {
+        char newDirection = _getch();
+        if (newDirection == 'w' || newDirection == 's' || newDirection == 'a' || newDirection == 'd') {
+            // Prevent the snake from reversing
+            if (!((snake->direction == 'w' && newDirection == 's') ||
+                  (snake->direction == 's' && newDirection == 'w') ||
+                  (snake->direction == 'a' && newDirection == 'd') ||
+                  (snake->direction == 'd' && newDirection == 'a'))) {
+                snake->direction = newDirection;
+            }
+        }
+    }
+
+    // Move the snake in the direction
+    switch (snake->direction) {
+        case 'w': newY--; break;
+        case 's': newY++; break;
+        case 'a': newX--; break;
+        case 'd': newX++; break;
+    }
+
+    // Check if snake hits the wall
+    if (newX <= 0 || newX >= WIDTH - 1 || newY <= 0 || newY >= HEIGHT - 1) {
+        *gameOver = 1;
+        return;
+    }
+
+    // Check if snake hits itself
+    SnakeSegment* current = snake->head;
+    while (current != NULL) {
+        if (current->x == newX && current->y == newY) {
+            *gameOver = 1;
+            return;
+        }
+        current = current->next;
+    }
+
+    // Add new head
+    SnakeSegment* newHead = (SnakeSegment*)malloc(sizeof(SnakeSegment));
+    newHead->x = newX;
+    newHead->y = newY;
+    newHead->next = snake->head;
+    snake->head = newHead;
+    snake->length++;
+
+    // Check if the snake eats the food
+    if (newX == food->x && newY == food->y) {
+        generateFood(food, snake);
+    } else {
+        // Remove the tail
+        SnakeSegment* prev = NULL;
+        current = snake->head;
+        while (current->next != NULL) {
+            prev = current;
+            current = current->next;
+        }
+        free(current);
+        prev->next = NULL;
+        snake->tail = prev;
+        snake->length--;
+    }
+}
+
+int main() {
+    Snake snake;
+    Food food;
+    int gameOver = 0;
+
+    initializeSnake(&snake);
+    generateFood(&food, &snake);
+
+    while (!gameOver) {
+        printBoard(&snake, &food);
+        moveSnake(&snake, &food, &gameOver);
+        _sleep(100);  // Control game speed
+    }
+
+    printf("Game Over! Your score is: %d\n", snake.length);
+    return 0;
+}
